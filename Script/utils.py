@@ -24,8 +24,8 @@ def import_and_clean_data():
     
     # NEXT BEST PARTY PREFERENCES
     df_nbp = ( # nbp = Next Best Party (Preferences)
-    pd.read_csv('../Data/next_best_party.csv', sep='\t', encoding='latin') # Tab-separated with header from SCB
-    .reset_index()
+        pd.read_csv('../Data/next_best_party.csv', sep='\t', encoding='latin') # Tab-separated with header from SCB
+        .reset_index()
     )
     
     df_nbp.columns = df_nbp.iloc[0]
@@ -50,12 +50,12 @@ def select_data(df_bp, df_nbp, date):
     df_bp.columns = ['best_party', 'current_votes']
     
     df = (
-        pd.merge(df_bp, df_nbp)
+        pd.merge(df_bp, df_nbp) # Merge the two datasets. 
         .replace('..', 0)
         .astype({'current_votes': float, 'redistribution_share': float})
         .assign(redistribution_share=lambda x: x['redistribution_share'] / 100)
-        .assign(initial_votes=lambda x: x['current_votes'].astype(float))
-        .assign(redistributed_votes=0)
+        .assign(initial_votes=lambda x: x['current_votes'].astype(float)) # Set initial_votes as the current votes.
+        .assign(redistributed_votes=0) # Set redistributed_votes to zero - since we haven't started redistributions.
     )
     
     return(df)
@@ -83,7 +83,7 @@ def current_results(data):
 def bottom_party_name(data):
     party = (
         current_results(data)
-        .query('current_votes != 0')
+        .query('current_votes != 0') # We do this to exclude parties that have already been redistributed. 
         .best_party.iloc[-1] # The party with the fewest votes. 
     )
     return(party)
@@ -95,7 +95,7 @@ def bottom_party_name(data):
 def top_party_votes_share(data):
     party = (
         current_results(data)
-        .assign(current_votes=lambda x: x['current_votes'] + x['redistributed_votes']) # To count the totals.
+        .assign(current_votes=lambda x: x['current_votes'] + x['redistributed_votes']) # Necessary to add the redistributed votes to the total.
         .sort_values('current_votes', ascending=False)
         .current_votes.iloc[0] # The party with the most votes. 
     )
@@ -145,13 +145,13 @@ def simulateRankBasedElection(data):
     
     # For each party, calculate the share of votes that have no next-best preference. These are the "diehard" voters. 
     diehard_votes = (
-    data.copy()
-    .query('next_best_party == "inget parti" or next_best_party == "vet ej/uppgift saknas"') # Select the people with no or unknown second-best parties. 
-    .assign(diehard_votes=lambda x: x['initial_votes'] * x['redistribution_share'].astype(float)) # Calculate their share of the vote. 
-    .drop(columns=['current_votes', 'next_best_party', 'redistribution_share', 'initial_votes'])
-    .groupby('best_party')
-    .aggregate({'diehard_votes':'sum'}) # Summarise their vote share per party. 
-    .reset_index()
+        data.copy()
+        .query('next_best_party == "inget parti" or next_best_party == "vet ej/uppgift saknas"') # Select the people with no or unknown second-best parties. 
+        .assign(diehard_votes=lambda x: x['initial_votes'] * x['redistribution_share'].astype(float)) # Calculate their share of the vote. 
+        .drop(columns=['current_votes', 'next_best_party', 'redistribution_share', 'initial_votes'])
+        .groupby('best_party')
+        .aggregate({'diehard_votes':'sum'}) # Summarise their vote share per party. 
+        .reset_index()
     )
     
     # Run through the votes redistribution algorithm. 
@@ -162,10 +162,10 @@ def simulateRankBasedElection(data):
     
     # Clean the data for the remaining party or parties. 
     data = (
-    data.drop(columns=['next_best_party', 'redistribution_share'])
-    .groupby('best_party')
-    .aggregate({'current_votes': 'mean', 'redistributed_votes': 'mean', 'initial_votes': 'mean'})
-    .reset_index()
+        data.drop(columns=['next_best_party', 'redistribution_share'])
+        .groupby('best_party')
+        .aggregate({'current_votes': 'mean', 'redistributed_votes': 'mean', 'initial_votes': 'mean'})
+        .reset_index()
     )
     
     # Merge with the unbudged votes to get the final election tally. 
@@ -174,20 +174,3 @@ def simulateRankBasedElection(data):
     data = data.assign(current_votes=lambda x: x['current_votes'] + x['redistributed_votes']) # Then, they get their redistributed votes added to their current votes tally. 
     
     return(data)
-
-#############################################
-####### DEFINE POLITICAL BLOCS
-#############################################
-
-def bloc(party):
-    return {
-        'V': 'Socialdemokratin',
-        'SD': 'SD',
-        'M': 'Alliansen', 
-        'C': 'Alliansen',
-        'L': 'Alliansen', 
-        'KD': 'Alliansen',
-        'S': 'Socialdemokratin', 
-        'MP': 'Socialdemokratin',
-        'övriga': 'övriga'
-    }[party]
